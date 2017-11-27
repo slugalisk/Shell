@@ -12,13 +12,16 @@ import (
 	"github.com/slugalisk/shell/proto/go"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
+var certPath string
 var host string
 var port int
 var timeout int64
 
 func init() {
+	flag.StringVar(&certPath, "cert-path", "../../certs/server.pem", "server certificate path")
 	flag.StringVar(&host, "host", "localhost", "command server host")
 	flag.IntVar(&port, "port", 30013, "command server tcp port")
 	flag.Int64Var(&timeout, "timeout", 60, "command timeout")
@@ -30,8 +33,16 @@ type Client struct {
 }
 
 // NewClient create client wrapper
-func NewClient(host string, port int) (*Client, error) {
-	conn, err := grpc.Dial(net.JoinHostPort(host, strconv.Itoa(port)), grpc.WithInsecure())
+func NewClient(certPath string, host string, port int) (*Client, error) {
+	creds, err := credentials.NewClientTLSFromFile(certPath, "")
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := grpc.Dial(
+		net.JoinHostPort(host, strconv.Itoa(port)),
+		grpc.WithTransportCredentials(creds),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +98,7 @@ func main() {
 		log.Fatal("missing command")
 	}
 
-	client, err := NewClient(host, port)
+	client, err := NewClient(certPath, host, port)
 	if err != nil {
 		log.Fatal(err)
 	}

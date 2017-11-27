@@ -17,13 +17,16 @@ import (
 	"github.com/slugalisk/shell/proto/go"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
+var certPath string
 var host string
 var port int
 var reconnectIvl int64
 
 func init() {
+	flag.StringVar(&certPath, "cert-path", "../../certs/server.pem", "server certificate path")
 	flag.StringVar(&host, "host", "localhost", "command server host")
 	flag.IntVar(&port, "port", 30013, "command server tcp port")
 	flag.Int64Var(&reconnectIvl, "reconnect-ivl", 10, "reconnect interval in seconds")
@@ -64,8 +67,20 @@ type Shell struct {
 }
 
 // NewShell create client wrapper
-func NewShell(host string, port int) *Shell {
-	conn, _ := grpc.Dial(net.JoinHostPort(host, strconv.Itoa(port)), grpc.WithInsecure())
+func NewShell(certPath string, host string, port int) *Shell {
+	creds, err := credentials.NewClientTLSFromFile(certPath, "")
+	if err != nil {
+		log.Fatalf("could not load tls cert: %s", err)
+	}
+
+	conn, err := grpc.Dial(
+		net.JoinHostPort(host, strconv.Itoa(port)),
+		grpc.WithTransportCredentials(creds),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return &Shell{
 		client: shell.NewShellClient(conn),
 	}
@@ -165,6 +180,6 @@ func (s *Shell) exec(command *shell.Command, client shell.Shell_FollowClient) er
 func main() {
 	flag.Parse()
 
-	shell := NewShell(host, port)
+	shell := NewShell(certPath, host, port)
 	shell.FollowForever(reconnectIvl)
 }

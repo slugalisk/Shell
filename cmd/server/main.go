@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -11,28 +12,42 @@ import (
 	"github.com/slugalisk/shell/proto/go"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
+
+// ServerOptions ...
+type ServerOptions struct {
+	Host     string
+	Port     int
+	CertPath string
+	KeyPath  string
+}
+
+var options ServerOptions
+
+func init() {
+	flag.StringVar(&options.Host, "host", "localhost", "command server host")
+	flag.IntVar(&options.Port, "port", 30013, "command server tcp port")
+	flag.StringVar(&options.CertPath, "cert-path", "../../certs/server.pem", "tls certificate")
+	flag.StringVar(&options.KeyPath, "key-path", "../../certs/server-key.pem", "tls key")
+}
 
 // Server ...
 type Server struct {
-	service *Service
-	server  *grpc.Server
-}
-
-// NewServer ...
-func NewServer() *Server {
-	s := &Server{
-		service: NewService(),
-		server:  grpc.NewServer(),
-	}
-	shell.RegisterShellServer(s.server, s.service)
-
-	return s
+	server *grpc.Server
 }
 
 // Serve ...
-func (s *Server) Serve(host string, port int) error {
-	l, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+func (s *Server) Serve(options ServerOptions) error {
+	creds, err := credentials.NewServerTLSFromFile(options.CertPath, options.KeyPath)
+	if err != nil {
+		return fmt.Errorf("could not load TLS keys: %s", err)
+	}
+
+	s.server = grpc.NewServer(grpc.Creds(creds))
+	shell.RegisterShellServer(s.server, NewService())
+
+	l, err := net.Listen("tcp", net.JoinHostPort(options.Host, strconv.Itoa(options.Port)))
 	if err != nil {
 		return err
 	}
@@ -48,18 +63,9 @@ func (s *Server) Stop() {
 	}
 }
 
-var host string
-var port int
-
-func init() {
-	flag.StringVar(&host, "host", "localhost", "command server host")
-	flag.IntVar(&port, "port", 30013, "command server tcp port")
-}
-
 func main() {
-	server := NewServer()
-
-	go server.Serve(host, port)
+	server := Server{}
+	go log.Fatal(server.Serve(options))
 
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
