@@ -128,7 +128,7 @@ func (s *Shell) pumpResponse(
 	source shell.CommandOutput_Source,
 	pipe io.ReadCloser,
 	client shell.Shell_FollowClient,
-	wg *sync.WaitGroup,
+	done func(),
 ) {
 	scanner := bufio.NewScanner(pipe)
 	for scanner.Scan() {
@@ -138,7 +138,7 @@ func (s *Shell) pumpResponse(
 		SendOutput(client, commandID, shell.CommandOutput_DAEMON, err.Error())
 	}
 
-	wg.Done()
+	done()
 }
 
 func (s *Shell) exec(command *shell.Command, client shell.Shell_FollowClient) error {
@@ -165,8 +165,8 @@ func (s *Shell) exec(command *shell.Command, client shell.Shell_FollowClient) er
 	// pump the results to the client
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	go s.pumpResponse(command.Id, shell.CommandOutput_STDOUT, stdout, client, wg)
-	go s.pumpResponse(command.Id, shell.CommandOutput_STDERR, stderr, client, wg)
+	go s.pumpResponse(command.Id, shell.CommandOutput_STDOUT, stdout, client, wg.Done)
+	go s.pumpResponse(command.Id, shell.CommandOutput_STDERR, stderr, client, wg.Done)
 	wg.Wait()
 
 	// wait for the command to exit and send an error (probably non 0 exit code...?)
