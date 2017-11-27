@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package shell;
+option go_package="shell";
+
+import "google/protobuf/timestamp.proto";
+
+
+message Ping {
+  google.protobuf.Timestamp time = 1;
+}
+
+message Command {
+  string id = 1;
+  string name = 2;
+  repeated string args = 3;
+  int64 timeout = 4;
+}
+
+message CommandOutput {
+  enum Source {
+    DAEMON = 0;
+    STDOUT = 1;
+    STDERR = 2;
+  }
+
+  string command_id = 1;
+  string shell_id = 2;
+  google.protobuf.Timestamp time = 3;
+  Source source = 4;
+  string line = 5;
+}
+
+message CommandExit {
+  string command_id = 1;
+  string shell_id = 2;
+  google.protobuf.Timestamp time = 3;
+  int64 code = 4;
+}
+
+message TimeRequest {}
+
+message TimeResponse {
+  google.protobuf.Timestamp time = 1;
+}
+
+message PingRequest {
+  Ping data = 1;
+}
+
+message PingResponse {
+  Ping data = 1;
+}
+
+message ExecRequest {
+  Command command = 1;
+}
+
+message ExecResponse {
+  CommandOutput output = 1;
+}
+
+message FollowRequest {
+  oneof data {
+    CommandOutput output = 1;
+    CommandExit exit = 2;
+  }
+}
+
+message FollowResponse {
+  Command command = 1;
+}
+
+service Shell {
+  rpc Time(TimeRequest) returns (TimeResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
+  rpc Exec(ExecRequest) returns (stream ExecResponse) {}
+  rpc Follow(stream FollowRequest) returns (stream FollowResponse) {}
+}
