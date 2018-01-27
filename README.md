@@ -24,6 +24,6 @@ $ go run *.go
 
 Run `ping` on the worker for 5 seconds
 ```
-$ cd cmd/shell
+$ cd cmd/client
 $ go run *.go -timeout 5 -- ping google.com
 ```
